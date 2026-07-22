@@ -4,13 +4,18 @@ import mlx_whisper
 import numpy as np
 from opencc import OpenCC
 
-from config import CUSTOM_VOCABULARY, INITIAL_PROMPT, LANGUAGE, MODEL_REPO
-
-_t2s = OpenCC("t2s")
+from config import CUSTOM_VOCABULARY, INITIAL_PROMPT, LANGUAGE, MODEL_REPO, OUTPUT_CHINESE
 
 _PROMPT = INITIAL_PROMPT
 if CUSTOM_VOCABULARY:
     _PROMPT += "常见专业词汇：" + "、".join(CUSTOM_VOCABULARY) + "。"
+
+_CONVERTERS = {"simplified": OpenCC("t2s"), "traditional": OpenCC("s2t")}
+
+
+def normalize_chinese(text: str, mode: str) -> str:
+    converter = _CONVERTERS.get(mode)
+    return converter.convert(text) if converter else text
 
 
 class Transcriber:
@@ -28,4 +33,4 @@ class Transcriber:
             language=LANGUAGE,
             initial_prompt=_PROMPT,
         )
-        return _t2s.convert(result["text"].strip())
+        return normalize_chinese(result["text"].strip(), OUTPUT_CHINESE)

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """菜单栏本地语音转文字应用。
 
-按住 Fn 键说话，松开后自动用本地 faster-whisper 模型转成文字，
+按住 Fn 键说话，松开后自动用本地 mlx-whisper 模型转成文字，
 并尝试直接输入到当前光标处；如果找不到可编辑的光标，就把文字放进剪贴板。
 """
 import threading
@@ -38,6 +38,7 @@ class DictationApp(rumps.App):
         self.menu = ["模型加载中…"]
         self.recorder = AudioRecorder()
         self.transcriber = None
+        self._model_error = None
         self._max_duration_timer = None
         self._recording_lock = threading.Lock()
 
@@ -51,15 +52,39 @@ class DictationApp(rumps.App):
         threading.Thread(target=self._load_model, daemon=True).start()
 
     def _load_model(self):
-        self.transcriber = Transcriber()
+        try:
+            transcriber = Transcriber()
+        except Exception as exc:
+            run_on_main(lambda: self._show_model_error(str(exc)))
+            return
 
-        def on_ready():
-            if self.title != ICON_ERROR:
-                self.title = ICON_READY
-            self.menu.clear()
-            self.menu.add(rumps.MenuItem("按住 Fn 说话，松开自动输入到光标处"))
+        self.transcriber = transcriber
+        run_on_main(self._show_ready)
 
-        run_on_main(on_ready)
+    def _show_ready(self):
+        if self.title != ICON_ERROR:
+            self.title = ICON_READY
+        self.menu.clear()
+        self.menu.add(rumps.MenuItem("按住 Fn 说话，松开自动输入到光标处"))
+
+    def _show_model_error(self, message: str):
+        self._model_error = message
+        self.title = ICON_ERROR
+        self.menu.clear()
+        self.menu.add(rumps.MenuItem("模型加载失败"))
+        self.menu.add(rumps.MenuItem("查看错误", callback=self._on_view_model_error))
+        self.menu.add(rumps.MenuItem("重新加载模型", callback=self._on_reload_model))
+
+    def _on_view_model_error(self, sender):
+        rumps.alert("模型加载失败", self._model_error or "未知错误")
+
+    def _on_reload_model(self, sender):
+        self.transcriber = None
+        self._model_error = None
+        self.title = ICON_LOADING
+        self.menu.clear()
+        self.menu.add(rumps.MenuItem("模型加载中…"))
+        threading.Thread(target=self._load_model, daemon=True).start()
 
     def on_fn_press(self):
         if self.transcriber is None:

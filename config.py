@@ -8,6 +8,8 @@ MODEL_REPO = "mlx-community/whisper-large-v3-turbo"
 LANGUAGE = None
 # 用带标点的示例文本"提示"模型,减少输出中缺逗号/句号的情况
 INITIAL_PROMPT = "以下是带有标点符号的句子。你好，今天天气不错，我们去吃饭吧。"
+# 中文输出转换："simplified"=转简体 / "traditional"=转繁体 / "preserve"=保留模型原始输出不转换
+OUTPUT_CHINESE = "simplified"
 # 自定义词汇表：把你常说但总识别错的专业名词、人名、项目名加进来（追加即可，不用管顺序）。
 # 模型会参考这份清单，提高这些词被正确识别的概率。
 CUSTOM_VOCABULARY = [

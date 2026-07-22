@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "localasr"
+version = "0.1.0"
+description = "Offline push-to-talk dictation for Apple Silicon Macs"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.13,<3.14"  # only tested against 3.13.7 so far
+dependencies = [
+    "mlx-whisper",
+    "numpy",
+    "sounddevice",
+    "opencc-python-reimplemented",
+    "pyobjc-framework-ApplicationServices",
+    "pyobjc-framework-Cocoa",
+    "pyobjc-framework-Quartz",
+    "pyperclip",
+    "rumps",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "ruff",
+]
+
+[tool.setuptools]
+py-modules = [
+    "app",
+    "audio_recorder",
+    "config",
+    "hotkey_listener",
+    "text_output",
+    "transcriber",
+]

@@ -15,6 +15,7 @@ from config import CHANNELS, MAX_RECORD_SECONDS, SAMPLE_RATE
 class AudioRecorder:
     def __init__(self):
         self._frames = []
+        self._num_frames = 0
         self._lock = threading.Lock()
         self._recording = False
         self._stream = None
@@ -25,8 +26,8 @@ class AudioRecorder:
             if not self._recording:
                 return
             self._frames.append(indata.copy())
-            total = sum(f.shape[0] for f in self._frames)
-            if total >= self._max_frames:
+            self._num_frames += frames
+            if self._num_frames >= self._max_frames:
                 self._recording = False
 
     def start(self):
@@ -34,6 +35,7 @@ class AudioRecorder:
             if self._recording:
                 return
             self._frames = []
+            self._num_frames = 0
             self._recording = True
         self._stream = sd.InputStream(
             samplerate=SAMPLE_RATE,
