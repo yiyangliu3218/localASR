@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""mlx-whisper 模型封装(Apple Silicon GPU 加速),负责把录到的音频转成文字。"""
+"""Wraps mlx-whisper (Apple Silicon GPU accelerated) to turn recorded audio into text."""
 import mlx_whisper
 import numpy as np
 from opencc import OpenCC
@@ -20,8 +20,9 @@ def normalize_chinese(text: str, mode: str) -> str:
 
 class Transcriber:
     def __init__(self):
-        # mlx-whisper 没有常驻模型对象,首次调用 transcribe 时才会加载/下载模型；
-        # 这里提前跑一次空音频，把模型加载和下载放在启动阶段完成。
+        # mlx-whisper has no persistent model object; the model is only loaded/
+        # downloaded on the first call to transcribe. Run one dummy pass here so
+        # loading/downloading happens during startup instead of on first use.
         self.transcribe(np.zeros(16000, dtype=np.float32))
 
     def transcribe(self, audio: np.ndarray) -> str:

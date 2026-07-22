@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-"""把转录出的文字输出出去：
-一律尝试直接"打字"到当前光标所在的位置；
-只有在检测不到可编辑光标时，才额外把文本放进剪贴板兜底。
+"""Delivers the transcribed text to the user:
+always tries to "type" it directly at the current cursor position;
+only additionally copies it to the clipboard when no editable cursor is found.
 """
 import pyperclip
 from ApplicationServices import (
@@ -23,8 +23,9 @@ _SYSTEM_WIDE = AXUIElementCreateSystemWide()
 
 
 def _has_focused_editable_element() -> bool:
-    """查询系统当前聚焦的 UI 元素，判断它是否是一个可以写入文字的输入框。
-    仅用于决定要不要额外存一份到剪贴板，不用于决定要不要打字（打字总是会尝试）。
+    """Checks the system's currently focused UI element to see whether it's a
+    writable text field. Only used to decide whether to also copy to the
+    clipboard, never to decide whether to type (typing is always attempted).
     """
     err, focused_app = AXUIElementCopyAttributeValue(
         _SYSTEM_WIDE, kAXFocusedApplicationAttribute, None
@@ -43,7 +44,8 @@ def _has_focused_editable_element() -> bool:
 
 
 def _type_text(text: str):
-    """用模拟键盘事件把整段文字"打"到当前光标处，支持中英文 unicode。"""
+    """Types the whole string at the current cursor via synthetic keyboard
+    events; supports arbitrary Unicode (Chinese, English, etc.)."""
     down = CGEventCreateKeyboardEvent(None, 0, True)
     CGEventKeyboardSetUnicodeString(down, len(text), text)
     CGEventPost(kCGHIDEventTap, down)
@@ -54,7 +56,8 @@ def _type_text(text: str):
 
 
 def output_text(text: str, auto_type: bool = True, always_copy: bool = False) -> str:
-    """返回值: "typed" / "typed_and_clipboard" / "clipboard_only" / "empty"，供调用方更新菜单栏状态用。"""
+    """Returns "typed" / "typed_and_clipboard" / "clipboard_only" / "empty",
+    for the caller to update the menu bar status."""
     text = text.strip()
     if not text:
         return "empty"

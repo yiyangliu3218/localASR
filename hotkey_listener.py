@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
-"""全局监听 Fn 键的按下 / 松开，不管当前焦点在哪个 App 上都能收到。
+"""Globally listens for Fn key down/up events, regardless of which app has focus.
 
-用 ListenOnly 模式的事件龙头 (event tap) 监听 flagsChanged 事件里的
-SecondaryFn 标志位，只读不拦截，不会影响系统自身对 Fn 键的其他用途。
+Uses a ListenOnly-mode event tap on flagsChanged events, watching the
+SecondaryFn flag. It's read-only and never intercepts the event, so it
+doesn't interfere with any other system use of the Fn key.
 """
 import time
 
@@ -29,8 +30,9 @@ from config import MIN_PRESS_MS
 
 class FnHotkeyListener:
     def __init__(self, on_press, on_release):
-        """on_press(): Fn 刚按下时调用
-        on_release(valid: bool): Fn 松开时调用；valid=False 表示按下时间太短，应忽略本次录音
+        """on_press(): called right when Fn goes down.
+        on_release(valid: bool): called when Fn is released; valid=False means the
+        press was too short and this recording should be discarded.
         """
         self._on_press = on_press
         self._on_release = on_release

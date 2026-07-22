@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
-"""菜单栏本地语音转文字应用。
+"""Menu bar app for local speech-to-text dictation.
 
-按住 Fn 键说话，松开后自动用本地 mlx-whisper 模型转成文字，
-并尝试直接输入到当前光标处；如果找不到可编辑的光标，就把文字放进剪贴板。
+Hold the Fn key to speak; on release, transcribe locally with mlx-whisper
+and try to type the result at the current cursor. If no editable cursor
+is found, fall back to the clipboard.
 """
 import threading
+import time
 
 import rumps
 from AppKit import NSApplication, NSApplicationActivationPolicyAccessory
@@ -29,7 +31,7 @@ def run_on_main(fn):
 
 class DictationApp(rumps.App):
     def __init__(self):
-        # 不在 Dock 显示图标，只作为菜单栏小工具存在
+        # Hide the Dock icon; this only lives in the menu bar
         NSApplication.sharedApplication().setActivationPolicy_(
             NSApplicationActivationPolicyAccessory
         )
@@ -91,8 +93,9 @@ class DictationApp(rumps.App):
             return
         self.recorder.start()
         run_on_main(lambda: setattr(self, "title", ICON_RECORDING))
-        # 兜底：录音到时长上限后自动结束本次录音，不死等 Fn 松开事件
-        # （松开事件偶尔会因系统繁忙丢失，导致图标卡在录音状态）
+        # Safety net: auto-finish once the max duration is hit instead of
+        # waiting forever for the Fn release event (which can occasionally
+        # get dropped when the system is busy, leaving the icon stuck)
         self._max_duration_timer = threading.Timer(MAX_RECORD_SECONDS + 1, self._on_max_duration)
         self._max_duration_timer.daemon = True
         self._max_duration_timer.start()
@@ -101,20 +104,32 @@ class DictationApp(rumps.App):
         self.on_fn_release(True)
 
     def on_fn_release(self, valid: bool):
+        t_release = time.time()
         with self._recording_lock:
             if self._max_duration_timer is not None:
                 self._max_duration_timer.cancel()
                 self._max_duration_timer = None
             audio = self.recorder.stop()
+        print(f"[计时] 松开->停止录音: {time.time() - t_release:.2f}s", flush=True)
         if not valid or self.transcriber is None or audio.size == 0:
             run_on_main(lambda: setattr(self, "title", ICON_READY))
             return
         run_on_main(lambda: setattr(self, "title", ICON_TRANSCRIBING))
-        threading.Thread(target=self._transcribe_and_output, args=(audio,), daemon=True).start()
+        threading.Thread(
+            target=self._transcribe_and_output, args=(audio, t_release), daemon=True
+        ).start()
 
-    def _transcribe_and_output(self, audio):
+    def _transcribe_and_output(self, audio, t_release):
+        t0 = time.time()
         text = self.transcriber.transcribe(audio)
+        t1 = time.time()
         result = output_text(text, auto_type=AUTO_TYPE, always_copy=ALWAYS_COPY_TO_CLIPBOARD)
+        t2 = time.time()
+        print(
+            f"[计时] 转录: {t1 - t0:.2f}s, 输出: {t2 - t1:.2f}s, "
+            f"松开到出字总计: {t2 - t_release:.2f}s",
+            flush=True,
+        )
         run_on_main(lambda: setattr(self, "title", ICON_READY))
         if result == "clipboard_only":
             rumps.notification(

@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
-"""按需开关的麦克风录音器。
+"""Microphone recorder that opens the input stream on demand.
 
-只在真正录音时才打开麦克风流,这样 macOS 菜单栏的橙色麦克风指示灯
-只会在你按住热键说话的时候亮起,松开就熄灭,不会一直占用麦克风。
+The mic stream is only opened while actually recording, so macOS's orange
+menu bar recording indicator lights up only while the hotkey is held down
+and turns off on release, instead of the mic staying open the whole time.
 """
 import threading
 
