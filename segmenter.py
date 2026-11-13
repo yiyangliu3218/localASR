@@ -101,11 +101,18 @@ class DictationSession:
         self._parts = []
         self._error = None
         self._pending = np.zeros(0, dtype=np.float32)
+        self.samples_fed = 0  # diagnostics: how much audio reached the session
+        self.peak = 0.0
+        self.segments = 0  # how many speech segments the VAD produced
         self._worker = threading.Thread(target=self._run, daemon=True)
         self._worker.start()
 
     def feed(self, chunk: np.ndarray):
-        self._q.put(np.asarray(chunk, dtype=np.float32).reshape(-1))
+        chunk = np.asarray(chunk, dtype=np.float32).reshape(-1)
+        self.samples_fed += len(chunk)
+        if len(chunk):
+            self.peak = max(self.peak, float(np.abs(chunk).max()))
+        self._q.put(chunk)
 
     def finish(self, timeout: float = None) -> str:
         self._q.put(_STOP)
@@ -116,6 +123,7 @@ class DictationSession:
 
     def _drain_segments(self):
         while not self._vad.empty():
+            self.segments += 1
             text = self._transcribe(self._vad.pop_segment())
             if text:
                 self._parts.append(text)

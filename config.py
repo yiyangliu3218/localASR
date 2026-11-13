@@ -55,3 +55,7 @@ ALWAYS_COPY_TO_CLIPBOARD = False
 
 # ---- Hotkey ----
 MIN_PRESS_MS = 150  # Fn presses shorter than this are ignored, to filter out accidental taps
+# Swallow the Fn key's own press/release so macOS doesn't also run its globe-key
+# action (emoji picker / input source switch / system dictation), which steals focus.
+# Other keys and Fn+key combos are untouched. Needs Accessibility permission.
+SUPPRESS_FN_SYSTEM_ACTION = True

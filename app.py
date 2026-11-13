@@ -182,12 +182,21 @@ class DictationApp(rumps.App):
                 f"松开到出字总计: {time.time() - t_release:.2f}s",
                 flush=True,
             )
+            print(
+                f"[诊断] 录音 {session.samples_fed / config.SAMPLE_RATE:.1f}s, "
+                f"峰值音量 {session.peak:.3f}, 语音段 {session.segments}, 文字: {text!r}",
+                flush=True,
+            )
+            if not text.strip():
+                result = "nothing_heard"
         except Exception as exc:  # never leave the icon stuck on ⌛
             print(f"[错误] 转录失败: {exc!r}", flush=True)
             notify("语音转文字", "转录失败", str(exc))
         finally:
             run_on_main(lambda: setattr(self, "title", ICON_READY))
-        if result == "clipboard_only":
+        if result == "nothing_heard":
+            notify("语音转文字", "没有识别到语音", "请按住 Fn 后再说话，说完再松开")
+        elif result == "clipboard_only":
             notify("语音转文字", "未开启自动输入", "已复制到剪贴板，请手动粘贴 (Cmd+V)")
         elif result == "typed_and_clipboard":
             notify("语音转文字", "未找到可编辑光标", "已尝试输入，同时也复制到了剪贴板 (Cmd+V) 备用")

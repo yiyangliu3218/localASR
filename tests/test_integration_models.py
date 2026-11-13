@@ -18,7 +18,13 @@ from testset import TESTSET  # noqa: E402
 import config  # noqa: E402
 
 SV = os.path.join(MODELS_ROOT, "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17")
-pytestmark = pytest.mark.skipif(not os.path.isdir(SV), reason="SenseVoice model not downloaded")
+_MISSING_WAVS = [rel for _, rel, _ in TESTSET if not os.path.isfile(os.path.join(MODELS_ROOT, rel))]
+pytestmark = [
+    pytest.mark.skipif(not os.path.isdir(SV), reason="SenseVoice model not downloaded"),
+    # The test clips ship inside the benchmark models (bench/download_models.sh),
+    # which a normal app install does not fetch.
+    pytest.mark.skipif(bool(_MISSING_WAVS), reason="benchmark test audio not downloaded (bench/download_models.sh)"),
+]
 
 
 @pytest.fixture(scope="module")
