@@ -54,6 +54,15 @@ class DictationApp(rumps.App):
         # both down: every transcription goes through this lock.
         self._model_lock = threading.Lock()
 
+        self.overlay = None
+        if config.SHOW_OVERLAY:
+            try:
+                from overlay import Overlay
+
+                self.overlay = Overlay()
+            except Exception as exc:  # the HUD is cosmetic; never block dictation on it
+                print(f"[overlay] disabled: {exc!r}", flush=True)
+
         self.listener = FnHotkeyListener(self.on_fn_press, self.on_fn_release)
         try:
             self.listener.start()
@@ -108,6 +117,19 @@ class DictationApp(rumps.App):
         self.menu.add(rumps.MenuItem("模型加载中…"))
         threading.Thread(target=self._load_model, daemon=True).start()
 
+    def _hud(self, method, *args):
+        """Calls an Overlay method on the main thread; a HUD failure only logs."""
+        if self.overlay is None:
+            return
+
+        def call():
+            try:
+                getattr(self.overlay, method)(*args)
+            except Exception as exc:
+                print(f"[overlay] {method} failed: {exc!r}", flush=True)
+
+        run_on_main(call)
+
     def _transcribe(self, audio):
         with self._model_lock:
             return self.transcriber.transcribe(audio)
@@ -140,6 +162,7 @@ class DictationApp(rumps.App):
             self._max_duration_timer.daemon = True
             self._max_duration_timer.start()
         run_on_main(lambda: setattr(self, "title", ICON_RECORDING))
+        self._hud("show_recording", lambda: self.recorder.level)
 
     def _on_max_duration(self):
         self.on_fn_release(True)
@@ -158,8 +181,10 @@ class DictationApp(rumps.App):
             # Too-short tap: let the session wind down in the background, drop the text
             threading.Thread(target=session.finish, daemon=True).start()
             run_on_main(lambda: setattr(self, "title", ICON_READY))
+            self._hud("hide")
             return
         run_on_main(lambda: setattr(self, "title", ICON_TRANSCRIBING))
+        self._hud("show_transcribing")
         threading.Thread(
             target=self._finish_and_output, args=(session, t_release), daemon=True
         ).start()
@@ -194,6 +219,7 @@ class DictationApp(rumps.App):
             notify("语音转文字", "转录失败", str(exc))
         finally:
             run_on_main(lambda: setattr(self, "title", ICON_READY))
+            self._hud("hide")
         if result == "nothing_heard":
             notify("语音转文字", "没有识别到语音", "请按住 Fn 后再说话，说完再松开")
         elif result == "clipboard_only":

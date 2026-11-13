@@ -121,3 +121,27 @@ def test_model_load_failure_shows_error(monkeypatch):
         fn()  # original code raised NameError here (exc unbound after except)
     assert a.title == app_mod.ICON_ERROR
     assert "disk full" in a._model_error
+
+
+def test_overlay_follows_record_transcribe_hide(app):
+    app.overlay = mock.Mock()
+    app.transcriber.transcribe.return_value = "好的"
+    dictate(app, [np.ones(1600, np.float32)])
+    assert wait_until(lambda: app.outputs == ["好的"])
+    assert wait_until(lambda: [c[0] for c in app.overlay.method_calls]
+                      == ["show_recording", "show_transcribing", "hide"])
+
+
+def test_overlay_hides_on_short_tap(app):
+    app.overlay = mock.Mock()
+    app.transcriber.transcribe.return_value = "x"
+    dictate(app, [np.ones(1600, np.float32)], valid=False)
+    assert [c[0] for c in app.overlay.method_calls] == ["show_recording", "hide"]
+
+
+def test_overlay_failure_never_breaks_dictation(app):
+    app.overlay = mock.Mock()
+    app.overlay.show_recording.side_effect = RuntimeError("AppKit exploded")
+    app.transcriber.transcribe.return_value = "照样出字"
+    dictate(app, [np.ones(1600, np.float32)])
+    assert wait_until(lambda: app.outputs == ["照样出字"])
