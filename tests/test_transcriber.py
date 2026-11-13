@@ -69,3 +69,40 @@ def test_mlx_backend_disables_temperature_fallback():
     kwargs = fake.transcribe.call_args.kwargs
     assert kwargs["temperature"] == 0.0
     assert kwargs["condition_on_previous_text"] is False
+
+
+@pytest.mark.parametrize("text,expected", [
+    ("呃，我觉得可以。", "我觉得可以。"),
+    ("我觉得，呃，可以。", "我觉得，可以。"),
+    ("然后呃这个方案不错", "然后这个方案不错"),
+    ("好的呃。", "好的。"),
+    ("嗯嗯，好的", "好的"),
+    ("呃。", ""),
+    ("额，你说什么？", "你说什么？"),
+    ("我们 um 用 Kubernetes 吧", "我们用 Kubernetes 吧"),
+    ("Um, so I think so.", "So I think so."),
+    ("I, uh, think we should go.", "I think we should go."),
+    ("Uhh I mean yes", "I mean yes"),
+    ("So I think, ah, we should ship it today.", "So I think we should ship it today."),
+])
+def test_fillers_are_removed(text, expected):
+    assert tr.remove_fillers(text) == expected
+
+
+@pytest.mark.parametrize("text", [
+    "这个额外的金额额度",  # 额 as a real character
+    "啊，原来如此",  # 啊 carries tone, kept
+    "The umbrella is in the hummus.",  # fillers inside real words
+    "所以我要说什么呢？",
+    "Ah, I see.",
+])
+def test_real_words_are_not_treated_as_fillers(text):
+    assert tr.remove_fillers(text) == text
+
+
+def test_filler_removal_can_be_turned_off(monkeypatch):
+    monkeypatch.setattr(config, "REMOVE_FILLERS", False)
+    monkeypatch.setattr(config, "OUTPUT_CHINESE", "preserve")
+    assert tr.postprocess("呃，好的") == "呃，好的"
+    monkeypatch.setattr(config, "REMOVE_FILLERS", True)
+    assert tr.postprocess("呃，好的") == "好的"

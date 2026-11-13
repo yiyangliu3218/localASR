@@ -21,6 +21,8 @@ LANGUAGE = None
 # Kept bilingual on purpose: a purely Chinese prompt biases English speech toward
 # being transcribed (or even translated) as Chinese.
 INITIAL_PROMPT = "以下是普通话和 English 混合的句子，带有标点符号。今天我们 review 一下这个 PR 吧。"
+# Drop hesitation sounds (呃 / 嗯 / um / uh ...) from the transcript
+REMOVE_FILLERS = True
 # Chinese output normalization: "simplified" / "traditional" / "preserve" (leave model output as-is)
 OUTPUT_CHINESE = "simplified"
 # Custom vocabulary: add jargon, names, or project names you say often that keep getting
@@ -54,6 +56,7 @@ AUTO_TYPE = True  # True: always try to type directly at the cursor
 ALWAYS_COPY_TO_CLIPBOARD = False
 
 # ---- Hotkey ----
+SHOW_OVERLAY = True  # small floating level meter at the bottom of the screen while dictating
 MIN_PRESS_MS = 150  # Fn presses shorter than this are ignored, to filter out accidental taps
 # Swallow the Fn key's own press/release so macOS doesn't also run its globe-key
 # action (emoji picker / input source switch / system dictation), which steals focus.

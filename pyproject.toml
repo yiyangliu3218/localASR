@@ -41,6 +41,7 @@ py-modules = [
     "config",
     "hotkey_listener",
     "model_download",
+    "overlay",
     "segmenter",
     "text_output",
     "transcriber",

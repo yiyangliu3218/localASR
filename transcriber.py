@@ -51,11 +51,46 @@ def join_segments(parts) -> str:
     return out
 
 
+# Filler words. Kept conservative: only sounds that are (almost) never content.
+# 额 is also a real character (额外, 金额), so it only counts when it stands alone
+# between punctuation; 啊 is left alone because it often carries tone.
+_ZH_FILLER = r"(?:[呃嗯]+|(?<![\u4e00-\u9fff])额+(?![\u4e00-\u9fff]))"
+_EN_FILLER = r"(?:u+h+m*|u+m+|e+r+m+|h+m+)"
+_ZH_PUNCT = "，,、"
+_ZH_FILLER_BETWEEN = re.compile(rf"[{_ZH_PUNCT}]\s*{_ZH_FILLER}\s*[{_ZH_PUNCT}]\s*")
+_ZH_FILLER_ANY = re.compile(rf"{_ZH_FILLER}\s*[{_ZH_PUNCT}]?\s*")
+# Mid-sentence ", ah," is a hesitation too (SenseVoice often hears "uh" as "ah"),
+# but a leading "Ah, I see" is kept.
+_EN_FILLER_BETWEEN = re.compile(rf"\s*,\s*\b(?:{_EN_FILLER}|a+h+)\b\s*,\s*", re.IGNORECASE)
+_EN_FILLER_ANY = re.compile(rf"\b{_EN_FILLER}\b[,.]?\s*", re.IGNORECASE)
+
+
+def remove_fillers(text: str) -> str:
+    """Drops hesitation sounds: "呃，我觉得，嗯，可以" -> "我觉得，可以";
+    "Um, so I, uh, think" -> "So I think"."""
+    original = text
+    text = _ZH_FILLER_BETWEEN.sub("，", text)
+    text = _EN_FILLER_BETWEEN.sub(" ", text)
+    text = _ZH_FILLER_ANY.sub("", text)
+    text = _EN_FILLER_ANY.sub("", text)
+    if text == original:
+        return text
+    text = re.sub(r"^[\s，,、。.!！?？]+", "", text)  # filler was the first word
+    text = re.sub(r"[，,、]+(?=[。.!！?？]|$)", "", text)  # "好的，" + removed filler + "。"
+    text = re.sub(r"(?<=[\u4e00-\u9fff])\s+(?=[\u4e00-\u9fff])", "", text)  # "我们 um 用" -> "我们用"
+    text = re.sub(r"\s{2,}", " ", text).strip()
+    if text and text[0].islower() and original.lstrip()[:1].lower() != text[0]:
+        text = text[0].upper() + text[1:]  # "Um, so..." -> "So..."
+    return text
+
+
 def postprocess(text: str) -> str:
     text = text.strip()
     if _HALLUCINATIONS.match(text):
         return ""
     text = normalize_chinese(text, config.OUTPUT_CHINESE)
+    if config.REMOVE_FILLERS:
+        text = remove_fillers(text)
     return apply_vocabulary(text, config.CUSTOM_VOCABULARY)
 
 

@@ -22,6 +22,7 @@ class AudioRecorder:
         self._stream = None
         self._on_chunk = None
         self._max_frames = SAMPLE_RATE * MAX_RECORD_SECONDS
+        self.level = 0.0  # RMS of the latest block, for the on-screen level meter
 
     def _callback(self, indata, frames, time_info, status):
         # Runs on PortAudio's real-time thread: keep it cheap, never block.
@@ -30,6 +31,8 @@ class AudioRecorder:
                 return
             room = self._max_frames - self._num_frames
             chunk = indata[:room, 0].copy()  # mono float32, capped at the max length
+            if len(chunk):
+                self.level = float(np.sqrt(np.mean(np.square(chunk))))
             self._frames.append(chunk)
             self._num_frames += len(chunk)
             if self._num_frames >= self._max_frames:
@@ -46,6 +49,7 @@ class AudioRecorder:
             self._frames = []
             self._num_frames = 0
             self._on_chunk = on_chunk
+            self.level = 0.0
             self._recording = True
         try:
             self._stream = sd.InputStream(
@@ -68,6 +72,7 @@ class AudioRecorder:
             frames = self._frames
             self._frames = []
             self._on_chunk = None
+            self.level = 0.0
         stream, self._stream = self._stream, None
         if stream is not None:
             stream.stop()
