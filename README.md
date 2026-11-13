@@ -41,15 +41,18 @@ From a clone instead: `git clone https://github.com/yiyangliu3218/localASR.git &
 
 ## Use
 
-```bash
-localasr
-```
+The installer puts **LocalASR.app** in `~/Applications` and starts it at login, so
+it's simply there in the menu bar. If you quit it, open it again from Launchpad /
+Spotlight (or run `localasr` in a terminal). Only one copy runs at a time.
 
-A menu bar icon appears. **The first time**, macOS needs two permissions for the
-terminal app you launched it from (Terminal, iTerm, …): open **System Settings →
-Privacy & Security** and enable it under both **Accessibility** (to type text) and
-**Input Monitoring** (to see the Fn key). Then quit and reopen the terminal and run
-`localasr` again.
+**The first time**, macOS needs permissions for LocalASR: open **System Settings →
+Privacy & Security** and turn on **LocalASR** under both **Accessibility** (to type
+text) and **Input Monitoring** (to see the Fn key). If it isn't listed, click **+**
+and pick `~/Applications/LocalASR.app`. Allow the microphone when asked. Then quit
+LocalASR from its menu bar icon and open it again.
+
+Running `localasr` from a terminal instead uses the terminal's permissions, so in
+that case grant them to Terminal / iTerm.
 
 | Icon | Meaning |
 |---|---|
@@ -74,12 +77,13 @@ picker / switches input source when you use it; Fn + other keys (brightness, arr
 curl -fsSL https://raw.githubusercontent.com/yiyangliu3218/localASR/main/install.sh | bash
 
 # uninstall
+~/localASR/macos/make_app.sh --uninstall   # stops it, removes the app and the login item
 rm -rf ~/localASR ~/.cache/localasr ~/.local/bin/localasr
 ```
 
 ## Configuration
 
-Edit `~/localASR/config.py`, then restart `localasr`. The most useful options:
+Edit `~/localASR/config.py`, then quit and reopen LocalASR. The most useful options:
 
 ```python
 ENGINE = "sensevoice"          # or "mlx-whisper" (install with LOCALASR_WHISPER=1)
@@ -94,7 +98,8 @@ LANGUAGE = None                # Whisper only: force "zh" or "en"
 ## Troubleshooting
 
 - **Nothing happens when I hold Fn**: check the menu bar icon. ⚠️ means a missing
-  permission (see above). Otherwise look at the terminal: every dictation prints a
+  permission (see above). Otherwise look at `~/Library/Logs/LocalASR/LocalASR.log` (or the terminal, if
+  you started it with `localasr`): every dictation prints a
   `[诊断]` line with the recording length, volume and recognized text. A very short
   press (under ~0.2 s) records nothing — hold Fn while you speak.
 - **Model download is slow or fails**: download these two files in a browser and put

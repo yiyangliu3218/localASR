@@ -114,7 +114,7 @@ class SenseVoiceBackend:
             tokens=f"{d}/tokens.txt",
             num_threads=config.NUM_THREADS,
             use_itn=True,  # punctuation + "九点" -> "9点"
-            language="auto",
+            language=config.SENSEVOICE_LANGUAGE,
         )
 
     def transcribe(self, audio: np.ndarray) -> str:
