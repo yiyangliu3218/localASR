@@ -10,7 +10,7 @@ readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.13,<3.14"  # only tested against 3.13.7 so far
 dependencies = [
-    "mlx-whisper",
+    "sherpa-onnx>=1.10",  # SenseVoice engine + Silero VAD (CPU, any platform)
     "numpy",
     "sounddevice",
     "opencc-python-reimplemented",
@@ -22,9 +22,13 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+mlx = [
+    "mlx-whisper",  # ENGINE = "mlx-whisper" (Apple Silicon only)
+]
 dev = [
     "pytest",
     "ruff",
+    "soundfile",  # benchmark + integration tests
 ]
 
 [tool.setuptools]
@@ -33,6 +37,11 @@ py-modules = [
     "audio_recorder",
     "config",
     "hotkey_listener",
+    "model_download",
+    "segmenter",
     "text_output",
     "transcriber",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

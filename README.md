@@ -2,14 +2,20 @@
 
 An offline, push-to-talk-with-Fn, menu bar dictation tool for Apple Silicon Macs.
 
-Hold **Fn** to speak; on release, it transcribes locally with a Whisper model
-(`mlx-whisper`, Apple Silicon GPU accelerated) and types the result at the current
-cursor (Chinese output is converted to Simplified by default, configurable). Only
-when no editable cursor is found does it additionally copy the text to the clipboard.
+Hold **Fn** to speak; on release, the text is typed at the current cursor (Chinese
+output is converted to Simplified by default, configurable). Only when no editable
+cursor is found does it additionally copy the text to the clipboard.
+
+Recognition runs locally with **SenseVoice-Small** (via `sherpa-onnx`, default) or
+**Whisper large-v3-turbo** (`mlx-whisper`, Apple Silicon GPU). Speech is cut at
+natural pauses and each phrase is transcribed *while you are still talking*, so the
+wait after releasing Fn is ~0.1–0.2 s regardless of how long you dictated.
+See [docs/REVIEW_AND_BENCHMARK.md](docs/REVIEW_AND_BENCHMARK.md) for measurements.
 
 Fully local inference — no network calls, no audio ever uploaded. Supports Chinese
 and English, including code-switched speech, with automatic language detection.
-The model is downloaded on first run; after that it works fully offline.
+Models are downloaded on first run (SenseVoice from GitHub releases into
+`~/.cache/localasr/models`, Whisper from Hugging Face); after that it works fully offline.
 
 ## Requirements
 
@@ -77,13 +83,16 @@ Quit: click the menu bar icon → Quit.
 ## Configuration (`config.py`)
 
 ```python
-MODEL_REPO = "mlx-community/whisper-large-v3-turbo"  # mlx-whisper model, Apple Silicon GPU accelerated
-LANGUAGE = None          # None = auto-detect Chinese/English; can also force "zh" or "en"
+ENGINE = "sensevoice"    # or "mlx-whisper" (original engine, Apple Silicon GPU)
+STREAMING = True         # transcribe phrase by phrase while you talk (low release latency)
+TYPE_WHILE_SPEAKING = False  # True = type each phrase immediately, while Fn is still held
+MODEL_REPO = "mlx-community/whisper-large-v3-turbo"  # only for ENGINE = "mlx-whisper"
+LANGUAGE = None          # Whisper only: None = auto-detect; can also force "zh" or "en"
 CUSTOM_VOCABULARY = []   # jargon/names that keep getting misrecognized — add them here
 OUTPUT_CHINESE = "simplified"  # "simplified" / "traditional" / "preserve" (don't convert model output)
 AUTO_TYPE = True         # False = only copy to clipboard, don't auto-type
 ALWAYS_COPY_TO_CLIPBOARD = False  # True = always also copy to clipboard, regardless of cursor detection
-MAX_RECORD_SECONDS = 60  # max length of a single recording
+MAX_RECORD_SECONDS = 300 # max length of a single recording
 ```
 
 After editing `config.py`, quit the menu bar app and rerun `./run.sh` for changes
@@ -103,6 +112,17 @@ faster, but somewhat less accurate).
 - **Inaccurate recognition / poor mixed Chinese-English handling**: try forcing
   `LANGUAGE = "zh"` / `"en"` (gives up automatic code-switch detection in
   exchange for accuracy).
+
+## Tests & benchmark
+
+```bash
+pip install -e ".[dev]"
+python -m pytest                                   # unit tests (no Mac / models needed)
+bench/download_models.sh ~/.cache/localasr/models  # free models, ~4 GB
+python -m pytest                                   # now also runs real-model integration tests
+python bench/run_bench.py --models-root ~/.cache/localasr/models --mlx   # add --mlx on Apple Silicon
+python bench/bench_realtime.py --models-root ~/.cache/localasr/models
+```
 
 ## License
 

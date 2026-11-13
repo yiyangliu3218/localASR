@@ -3,3 +3,5 @@ __pycache__/
 .venv/
 .claude/
 *.egg-info/
+bench_results.json
+.pytest_cache/
