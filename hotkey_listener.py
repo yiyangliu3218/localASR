@@ -11,8 +11,10 @@ import time
 
 from Quartz import (
     CFMachPortCreateRunLoopSource,
+    CFMachPortInvalidate,
     CFRunLoopAddSource,
     CFRunLoopGetCurrent,
+    CFRunLoopRemoveSource,
     CGEventGetFlags,
     CGEventMaskBit,
     CGEventTapCreate,
@@ -42,7 +44,18 @@ class FnHotkeyListener:
         self._fn_down = False
         self._press_time = 0.0
         self._tap = None
+        self._source = None
         self._swallow = False
+
+    @property
+    def active(self) -> bool:
+        """True once Fn events are being received."""
+        return self._tap is not None
+
+    @property
+    def intercepting(self) -> bool:
+        """True if Fn's own system action is being swallowed (needs Accessibility)."""
+        return self._swallow
 
     def _callback(self, proxy, event_type, event, refcon):
         if event_type in (kCGEventTapDisabledByTimeout, kCGEventTapDisabledByUserInput):
@@ -79,7 +92,7 @@ class FnHotkeyListener:
                 None,
             )
 
-        self._tap = None
+        self.stop()
         if SUPPRESS_FN_SYSTEM_ACTION:
             self._tap = create(kCGEventTapOptionDefault)
             self._swallow = self._tap is not None
@@ -91,9 +104,20 @@ class FnHotkeyListener:
         if self._tap is None:
             raise RuntimeError(
                 "无法创建全局按键监听。请打开 系统设置 > 隐私与安全性，"
-                "在「辅助功能」和「输入监控」里都允许当前使用的终端 App（如 Terminal / iTerm），"
-                "然后重新运行本程序。"
+                "在「辅助功能」和「输入监控」里都打开 LocalASR"
+                "（如果是从终端运行的，则打开该终端 App）。打开后会自动生效。"
             )
-        run_loop_source = CFMachPortCreateRunLoopSource(None, self._tap, 0)
-        CFRunLoopAddSource(CFRunLoopGetCurrent(), run_loop_source, kCFRunLoopCommonModes)
+        self._source = CFMachPortCreateRunLoopSource(None, self._tap, 0)
+        CFRunLoopAddSource(CFRunLoopGetCurrent(), self._source, kCFRunLoopCommonModes)
         CGEventTapEnable(self._tap, True)
+
+    def stop(self):
+        """Removes the tap, so start() can create a better one after permissions change."""
+        if self._tap is not None:
+            CGEventTapEnable(self._tap, False)
+            if self._source is not None:
+                CFRunLoopRemoveSource(CFRunLoopGetCurrent(), self._source, kCFRunLoopCommonModes)
+            CFMachPortInvalidate(self._tap)
+        self._tap = self._source = None
+        self._swallow = False
+        self._fn_down = False

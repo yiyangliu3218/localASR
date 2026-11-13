@@ -13,6 +13,7 @@ BARS = 11
 WIDTH, HEIGHT = 112, 34
 BAR_W, BAR_GAP = 3.0, 3.0
 FPS = 30
+CHECK_AFTER = 0.3  # seconds after showing before verifying the panel is really on screen
 
 
 def level_to_unit(rms: float) -> float:
@@ -100,6 +101,15 @@ class Overlay:
     """show_recording(level_fn) -> show_transcribing() -> hide(). Main thread only."""
 
     def __init__(self):
+        self._panel = self._view = None
+        self._build()
+        self._meter = Meter()
+        self._level_fn = None
+        self._timer = None
+        self._t0 = 0.0
+        self._shown_at = None  # set while a visibility check is pending
+
+    def _build(self):
         from AppKit import (
             NSBackingStoreBuffered,
             NSColor,
@@ -134,11 +144,9 @@ class Overlay:
         )
         self._view = _view_class().alloc().initWithFrame_(rect)
         panel.setContentView_(self._view)
+        if self._panel is not None:
+            self._panel.orderOut_(None)
         self._panel = panel
-        self._meter = Meter()
-        self._level_fn = None
-        self._timer = None
-        self._t0 = 0.0
 
     def _place(self):
         """Bottom centre of the screen the mouse is on, just above the Dock."""
@@ -165,7 +173,29 @@ class Overlay:
             self._timer.invalidate()
             self._timer = None
 
+    def _check_visible(self):
+        """After a long run the window server sometimes stops putting the panel on
+        screen while AppKit still reports it as shown. Detect that from the
+        occlusion state and rebuild the panel once."""
+        from AppKit import NSWindowOcclusionStateVisible
+
+        if self._shown_at is None or time.monotonic() - self._shown_at < CHECK_AFTER:
+            return
+        self._shown_at = None
+        p = self._panel
+        if p.occlusionState() & NSWindowOcclusionStateVisible:
+            return
+        print(f"[overlay] not on screen after show (isVisible={p.isVisible()}, "
+              f"onActiveSpace={p.isOnActiveSpace()}, occlusion={p.occlusionState()}, "
+              f"window={p.windowNumber()}, frame={tuple(p.frame().origin)}); rebuilding", flush=True)
+        recording, values = self._view.recording, self._view.values
+        self._build()
+        self._view.recording, self._view.values = recording, values
+        self._place()
+        self._panel.orderFrontRegardless()
+
     def _tick(self):
+        self._check_visible()
         if self._view.recording:
             self._meter.push(self._level_fn() if self._level_fn else 0.0)
             self._view.values = list(self._meter.values)
@@ -181,6 +211,7 @@ class Overlay:
         self._place()
         self._view.setNeedsDisplay_(True)
         self._panel.orderFrontRegardless()  # shows without activating our app
+        self._shown_at = time.monotonic()
         self._start_timer()
 
     def show_transcribing(self):
@@ -189,5 +220,6 @@ class Overlay:
         self._view.setNeedsDisplay_(True)
 
     def hide(self):
+        self._shown_at = None
         self._stop_timer()
         self._panel.orderOut_(None)

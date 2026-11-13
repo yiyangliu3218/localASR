@@ -100,12 +100,22 @@ def test_press_ignored_while_model_loading(app):
     app.recorder.start.assert_not_called()
 
 
-def test_mic_failure_notifies_and_stays_ready(app):
+def test_mic_failure_notifies_and_stays_ready(app, monkeypatch):
+    monkeypatch.setattr(app_mod.config, "SHOW_NOTIFICATIONS", True)
     app.recorder.start.side_effect = OSError("device busy")
     with mock.patch.object(app_mod.rumps, "notification") as n:
         app.on_fn_press()
     n.assert_called_once()
     assert app._session is None
+
+
+def test_notifications_off_only_logs(app, monkeypatch, capsys):
+    monkeypatch.setattr(app_mod.config, "SHOW_NOTIFICATIONS", False)
+    app.recorder.start.side_effect = OSError("device busy")
+    with mock.patch.object(app_mod.rumps, "notification") as n:
+        app.on_fn_press()
+    n.assert_not_called()
+    assert "device busy" in capsys.readouterr().out
 
 
 def test_model_load_failure_shows_error(monkeypatch):
@@ -145,3 +155,52 @@ def test_overlay_failure_never_breaks_dictation(app):
     app.transcriber.transcribe.return_value = "照样出字"
     dictate(app, [np.ones(1600, np.float32)])
     assert wait_until(lambda: app.outputs == ["照样出字"])
+
+
+def test_second_instance_is_refused(tmp_path, monkeypatch):
+    import fcntl
+
+    lock = tmp_path / "sub" / "app.lock"
+    monkeypatch.setattr(app_mod, "_lock_file", None)
+    assert app_mod.acquire_single_instance(str(lock))  # first copy gets it
+    held = app_mod._lock_file
+    # A second open of the same file (what another process would do) can't lock it
+    with open(lock, "w") as other:
+        with pytest.raises(OSError):
+            fcntl.flock(other, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    monkeypatch.setattr(app_mod, "_lock_file", None)
+    assert not app_mod.acquire_single_instance(str(lock))
+    held.close()  # first copy exits -> free again
+    assert app_mod.acquire_single_instance(str(lock))
+    app_mod._lock_file.close()
+
+
+def test_second_launch_asks_running_copy_to_show_menu(monkeypatch):
+    monkeypatch.setattr(app_mod, "acquire_single_instance", lambda: False)
+    center = mock.Mock()
+    monkeypatch.setattr(app_mod, "NSDistributedNotificationCenter",
+                        mock.Mock(defaultCenter=lambda: center))
+    monkeypatch.setattr(app_mod, "DictationApp", mock.Mock(side_effect=AssertionError))
+    assert app_mod.main() == 0
+    name = center.postNotificationName_object_userInfo_deliverImmediately_.call_args.args[0]
+    assert name == app_mod.REOPEN_NOTIFICATION
+
+
+def test_listener_restarts_once_permission_is_granted(app, monkeypatch):
+    app.listener = mock.Mock(active=True, intercepting=False)
+    monkeypatch.setattr(app_mod.config, "SUPPRESS_FN_SYSTEM_ACTION", True)
+    granted = {"ax": False}
+    monkeypatch.setattr(app_mod, "AXIsProcessTrusted", lambda: granted["ax"])
+    monkeypatch.setattr(app_mod, "CGPreflightListenEventAccess", lambda: True)
+    timer = mock.Mock()
+
+    app._permission_state = None
+    app._on_permission_tick(timer)  # still no Accessibility: nothing to do
+    app._on_permission_tick(timer)
+    app.listener.start.assert_not_called()
+
+    granted["ax"] = True  # user flips the switch
+    app.listener.start.side_effect = lambda: setattr(app.listener, "intercepting", True)
+    app._on_permission_tick(timer)
+    app.listener.start.assert_called_once()
+    timer.stop.assert_called_once()

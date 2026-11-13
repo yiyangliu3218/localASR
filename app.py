@@ -5,12 +5,16 @@ Hold the Fn key to speak; speech is transcribed locally (SenseVoice or mlx-whisp
 phrase by phrase while you talk, and on release the text is typed at the cursor. If no editable cursor
 is found, fall back to the clipboard.
 """
+import fcntl
+import os
 import threading
 import time
 
 import rumps
-from AppKit import NSApplication, NSApplicationActivationPolicyAccessory
-from Foundation import NSOperationQueue
+from AppKit import NSApplication, NSApplicationActivationPolicyAccessory, NSEvent
+from ApplicationServices import AXIsProcessTrusted, AXIsProcessTrustedWithOptions, kAXTrustedCheckOptionPrompt
+from Foundation import NSDistributedNotificationCenter, NSOperationQueue
+from Quartz import CGPreflightListenEventAccess, CGRequestListenEventAccess
 
 import config
 from audio_recorder import AudioRecorder
@@ -31,7 +35,9 @@ def run_on_main(fn):
 
 
 def notify(title, subtitle, message):
-    run_on_main(lambda: rumps.notification(title, subtitle, message))
+    print(f"[通知] {subtitle}: {message}", flush=True)
+    if config.SHOW_NOTIFICATIONS:
+        run_on_main(lambda: rumps.notification(title, subtitle, message))
 
 
 class DictationApp(rumps.App):
@@ -64,13 +70,59 @@ class DictationApp(rumps.App):
                 print(f"[overlay] disabled: {exc!r}", flush=True)
 
         self.listener = FnHotkeyListener(self.on_fn_press, self.on_fn_release)
-        try:
-            self.listener.start()
-        except RuntimeError as e:
-            self.title = ICON_ERROR
-            rumps.alert("热键监听启动失败", str(e))
+        self._permission_timer = None
+        self._permission_state = None
+        self._start_listener()
+        if not self._listener_complete():
+            request_permissions()
+            # Pick the permissions up as soon as they're switched on, no restart needed
+            self._permission_timer = rumps.Timer(self._on_permission_tick, 2)
+            self._permission_timer.start()
+
+        # Opening LocalASR.app again (Launchpad / Spotlight / Dock) while it's running
+        # pops this menu up at the mouse: the menu bar icon is easy to lose on a
+        # crowded menu bar, especially behind the notch.
+        self._reopen_observer = NSDistributedNotificationCenter.defaultCenter() \
+            .addObserverForName_object_queue_usingBlock_(
+                REOPEN_NOTIFICATION, None, NSOperationQueue.mainQueue(),
+                lambda note: self.show_menu_at_mouse())
 
         threading.Thread(target=self._load_model, daemon=True).start()
+
+    def _listener_complete(self):
+        return self.listener.active and (self.listener.intercepting or not config.SUPPRESS_FN_SYSTEM_ACTION)
+
+    def _start_listener(self, alert=True):
+        try:
+            self.listener.start()
+            if self.title == ICON_ERROR and self._model_error is None:
+                self.title = ICON_READY if self.transcriber else ICON_LOADING
+        except RuntimeError as e:
+            self.title = ICON_ERROR
+            if alert:
+                rumps.alert("需要权限", str(e))
+
+    def _on_permission_tick(self, timer):
+        state = (bool(AXIsProcessTrusted()), bool(CGPreflightListenEventAccess()))
+        changed, self._permission_state = state != self._permission_state, state
+        accessibility, listen = state
+        if changed and ((accessibility and not self.listener.intercepting)
+                        or (listen and not self.listener.active)):
+            print(f"[hotkey] permission granted (accessibility={bool(accessibility)}); "
+                  "restarting the Fn listener", flush=True)
+            self._start_listener(alert=False)
+        if self._listener_complete():
+            print("[hotkey] Fn listener fully enabled", flush=True)
+            timer.stop()
+
+    def show_menu_at_mouse(self):
+        print("[app] reopened: showing the menu at the mouse", flush=True)
+        try:
+            NSApplication.sharedApplication().activateIgnoringOtherApps_(True)
+            self._menu._menu.popUpMenuPositioningItem_atLocation_inView_(
+                None, NSEvent.mouseLocation(), None)
+        except Exception as exc:
+            print(f"[app] could not show the menu: {exc!r}", flush=True)
 
     def _load_model(self):
         print(f"[app] loading engine {config.ENGINE!r} (models dir: {config.MODELS_DIR})", flush=True)
@@ -228,7 +280,44 @@ class DictationApp(rumps.App):
             notify("语音转文字", "未找到可编辑光标", "已尝试输入，同时也复制到了剪贴板 (Cmd+V) 备用")
 
 
+REOPEN_NOTIFICATION = "local.localasr.reopen"
+def request_permissions():
+    """Asks macOS for the permissions the Fn listener needs. Each call shows the
+    system prompt (only while the permission is missing) and adds LocalASR to the
+    list in System Settings, so the user only has to flip the switch."""
+    if not AXIsProcessTrusted():
+        AXIsProcessTrustedWithOptions({kAXTrustedCheckOptionPrompt: True})
+    if not CGPreflightListenEventAccess():
+        CGRequestListenEventAccess()
+
+
+LOCK_PATH = os.path.expanduser("~/.cache/localasr/app.lock")
+_lock_file = None
+
+
+def acquire_single_instance(path=LOCK_PATH):
+    """True if no other LocalASR is running. Two copies would both grab Fn and type
+    every dictation twice (e.g. the login item plus a manual launch). The lock is held
+    for the life of the process and released by the OS when it exits."""
+    global _lock_file
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    f = open(path, "w")
+    try:
+        fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        f.close()
+        return False
+    _lock_file = f
+    return True
+
+
 def main():
+    if not acquire_single_instance():
+        print("[app] already running; asking it to show its menu", flush=True)
+        NSDistributedNotificationCenter.defaultCenter() \
+            .postNotificationName_object_userInfo_deliverImmediately_(
+                REOPEN_NOTIFICATION, None, None, True)
+        return 0
     DictationApp().run()
 
 

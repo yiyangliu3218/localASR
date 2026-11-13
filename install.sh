@@ -12,6 +12,7 @@
 #   LOCALASR_BRANCH=main        branch to install (one-liner mode)
 #   LOCALASR_WHISPER=1          also install the optional Whisper engine (~800 MB extra, Apple Silicon only)
 #   LOCALASR_SKIP_MODELS=1      don't pre-download the speech model now (it downloads on first launch)
+#   LOCALASR_NO_LOGIN=1         build LocalASR.app but don't start it at login
 #
 # Re-running it updates an existing install.
 set -euo pipefail
@@ -104,9 +105,27 @@ case ":$PATH:" in
     ;;
 esac
 
+# ---- 6. LocalASR.app + start at login ------------------------------------
+if bash macos/make_app.sh; then
 cat <<EOF
 
-LocalASR is installed.
+LocalASR is installed as ~/Applications/LocalASR.app and is running in the menu bar.
+It starts by itself when you log in; open it from Launchpad / Spotlight if you quit it.
+
+First run: in System Settings > Privacy & Security, turn on "LocalASR" under both
+"Accessibility" and "Input Monitoring" (use + and pick ~/Applications/LocalASR.app if
+it isn't listed), allow the microphone when asked, then quit LocalASR from its menu
+bar icon and open it again.
+
+Then hold Fn, speak, release: the text is typed at your cursor.
+Logs: ~/Library/Logs/LocalASR/LocalASR.log
+EOF
+return
+fi
+
+cat <<EOF
+
+LocalASR is installed (without the .app, see above).
 
 Start it:   localasr        (or: $DIR/run.sh)
 

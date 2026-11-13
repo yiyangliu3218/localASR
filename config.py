@@ -17,6 +17,11 @@ MODEL_REPO = "mlx-community/whisper-large-v3-turbo"
 # None = auto-detect language (recommended for mixed Chinese/English speech);
 # can also force "zh" or "en"
 LANGUAGE = None
+# SenseVoice language hint. "auto" also allows Japanese / Korean / Cantonese and turns
+# short phrases into kana ("Okay" -> "オッケー", "哎" -> "はい"). "zh" keeps output to
+# Chinese + English: English sentences and mixed speech come out unchanged, only a
+# lone short English word may be written in Chinese ("Hi" -> "嗨").
+SENSEVOICE_LANGUAGE = "zh"
 # Decoding "prompt" that nudges Whisper toward punctuated, code-switched output.
 # Kept bilingual on purpose: a purely Chinese prompt biases English speech toward
 # being transcribed (or even translated) as Chinese.
@@ -57,6 +62,7 @@ ALWAYS_COPY_TO_CLIPBOARD = False
 
 # ---- Hotkey ----
 SHOW_OVERLAY = True  # small floating level meter at the bottom of the screen while dictating
+SHOW_NOTIFICATIONS = False  # macOS pop-ups ("nothing heard", "copied to clipboard", errors); everything is also in the log
 MIN_PRESS_MS = 150  # Fn presses shorter than this are ignored, to filter out accidental taps
 # Swallow the Fn key's own press/release so macOS doesn't also run its globe-key
 # action (emoji picker / input source switch / system dictation), which steals focus.
