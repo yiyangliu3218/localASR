@@ -202,5 +202,9 @@ class DictationApp(rumps.App):
             notify("语音转文字", "未找到可编辑光标", "已尝试输入，同时也复制到了剪贴板 (Cmd+V) 备用")
 
 
-if __name__ == "__main__":
+def main():
     DictationApp().run()
+
+
+if __name__ == "__main__":
+    main()

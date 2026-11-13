@@ -29,8 +29,10 @@ mlx = [
 dev = [
     "pytest",
     "ruff",
-    "soundfile",  # benchmark + integration tests
 ]
+
+[project.scripts]
+localasr = "app:main"
 
 [tool.setuptools]
 py-modules = [
