@@ -64,6 +64,7 @@ class DictationApp(rumps.App):
         threading.Thread(target=self._load_model, daemon=True).start()
 
     def _load_model(self):
+        print(f"[app] loading engine {config.ENGINE!r} (models dir: {config.MODELS_DIR})", flush=True)
         try:
             transcriber = Transcriber()
             vad_factory = make_vad_factory() if config.STREAMING else None
@@ -71,11 +72,13 @@ class DictationApp(rumps.App):
             # Bind the message now: Python deletes `exc` when the except block
             # ends, so a lambda referencing it would raise NameError later.
             message = f"{type(exc).__name__}: {exc}"
+            print(f"[app] model failed to load: {message}", flush=True)
             run_on_main(lambda: self._show_model_error(message))
             return
 
         self._vad_factory = vad_factory
         self.transcriber = transcriber
+        print("[app] ready - hold Fn to dictate", flush=True)
         run_on_main(self._show_ready)
 
     def _show_ready(self):

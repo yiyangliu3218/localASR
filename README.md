@@ -103,6 +103,14 @@ faster, but somewhat less accurate).
 
 ## Troubleshooting
 
+- **Stuck on ⏳ / model download fails**: the terminal prints `[model]` progress
+  lines. If GitHub is slow or blocked on your network, download these two files in
+  a browser (or via any proxy) and put them, unextracted, into `~/.cache/localasr/models/`:
+  - `https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17.tar.bz2`
+  - `https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx`
+
+  Then use "Reload model" from the menu (or rerun `./run.sh`). Alternatively set
+  `LOCALASR_DOWNLOAD_BASE` to a mirror of that release URL.
 - **Holding Fn does nothing**: most likely a missing permission — check whether
   the menu bar icon is ⚠️; or the system Fn key behavior wasn't disabled and is
   intercepting it first.
