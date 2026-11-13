@@ -11,6 +11,7 @@ license = { file = "LICENSE" }
 requires-python = ">=3.13,<3.14"  # only tested against 3.13.7 so far
 dependencies = [
     "sherpa-onnx>=1.10",  # SenseVoice engine + Silero VAD (CPU, any platform)
+    "certifi",  # CA bundle for model downloads (python.org Python on macOS has none)
     "numpy",
     "sounddevice",
     "opencc-python-reimplemented",

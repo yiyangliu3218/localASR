@@ -50,3 +50,27 @@ def test_stalled_download_fails_with_clear_error_and_leaves_no_partial_model(tmp
     with pytest.raises(TimeoutError, match="LOCALASR_DOWNLOAD_BASE"):
         md.ensure_model_dir(str(tmp_path), NAME)
     assert os.listdir(tmp_path) == []
+
+
+def test_https_downloads_use_certifi_bundle(tmp_path, monkeypatch):
+    certifi = pytest.importorskip("certifi")
+    monkeypatch.delenv("SSL_CERT_FILE", raising=False)
+    seen = {}
+
+    def fake_urlopen(url, timeout=None, context=None):
+        seen["context"] = context
+        raise OSError("stop here")
+
+    monkeypatch.setattr(md.urllib.request, "urlopen", fake_urlopen)
+    with mock.patch.object(md.ssl, "create_default_context", wraps=md.ssl.create_default_context) as ctx:
+        with pytest.raises(OSError):
+            md._download("https://example.invalid/x", str(tmp_path / "x"))
+    ctx.assert_called_once_with(cafile=certifi.where())
+    assert seen["context"] is not None
+
+
+def test_ssl_cert_file_env_overrides_certifi(monkeypatch):
+    monkeypatch.setenv("SSL_CERT_FILE", "/custom/ca.pem")
+    with mock.patch.object(md.ssl, "create_default_context") as ctx:
+        md._ssl_context()
+    ctx.assert_called_once_with(cafile="/custom/ca.pem")

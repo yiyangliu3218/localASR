@@ -7,6 +7,7 @@ If GitHub is slow or blocked on your network, either
 """
 import os
 import socket
+import ssl
 import sys
 import tarfile
 import tempfile
@@ -22,6 +23,20 @@ SILERO_VAD = "silero_vad.onnx"
 _TIMEOUT_S = 30  # no bytes for this long -> fail with an error instead of hanging forever
 
 
+def _ssl_context():
+    """python.org builds of Python on macOS ship without system root certificates
+    (CERTIFICATE_VERIFY_FAILED); use certifi's CA bundle when it is installed.
+    An explicit SSL_CERT_FILE (e.g. a corporate proxy's CA) always wins."""
+    if os.environ.get("SSL_CERT_FILE"):
+        return ssl.create_default_context(cafile=os.environ["SSL_CERT_FILE"])
+    try:
+        import certifi
+
+        return ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        return ssl.create_default_context()
+
+
 def _log(msg):
     print(f"[model] {msg}", file=sys.stderr, flush=True)
 
@@ -29,7 +44,7 @@ def _log(msg):
 def _download(url: str, dest: str):
     _log(f"downloading {url}")
     t0 = last = time.time()
-    with urllib.request.urlopen(url, timeout=_TIMEOUT_S) as resp, open(dest, "wb") as f:
+    with urllib.request.urlopen(url, timeout=_TIMEOUT_S, context=_ssl_context()) as resp, open(dest, "wb") as f:
         total = int(resp.headers.get("Content-Length") or 0)
         done = 0
         while True:

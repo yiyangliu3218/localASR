@@ -172,7 +172,7 @@ Fn 松开 ──▶ recorder.stop() ──▶ session.finish()：flush 最后一
 ### 本地（推荐）
 | 方案 | 适用 | 说明 |
 |---|---|---|
-| **SenseVoice + VAD（当前默认）** | 任何 Mac（包括 Intel）/ Linux / Windows | 模型约 230 MB（int8），CPU 即可，松开 → 出字约 0.1–0.2 s |
+| **SenseVoice + VAD（当前默认）** | 任何 Mac（包括 Intel）/ Linux / Windows | 模型下载包约 1 GB（实际加载的 int8 模型约 240 MB），CPU 即可，松开 → 出字约 0.1–0.2 s |
 | mlx-whisper turbo + VAD | Apple Silicon，追求英文和标点质量 | `ENGINE = "mlx-whisper"`，已关闭 fallback |
 | mlx-whisper `whisper-large-v3-turbo-q4` | 内存小的 Mac | 更快但精度略降 |
 
