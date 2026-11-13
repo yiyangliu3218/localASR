@@ -1,5 +1,4 @@
 #!/bin/bash
-# Launch the local speech-to-text menu bar app
+# Launch the LocalASR menu bar app (after ./install.sh)
 cd "$(dirname "$0")"
-source .venv/bin/activate
-python3 app.py
+exec .venv/bin/python app.py
